@@ -14,3 +14,7 @@ Edge-only, offline. Nodes talk over ESP-NOW with no Wi-Fi or cloud, which double
 Closed loop. It acts physically, not just on a dashboard.
 Heartbeats. Nodes ping every 2 seconds, and a dead sensor raises a “node offline” alert.
 Live benchmark panel. It shows sensor-to-siren latency and false-alarm rate with consensus on and off.
+--------------------------------------
+Live demo:-
+https://aegis-murex-rho.vercel.app
+-----------------------------------------
