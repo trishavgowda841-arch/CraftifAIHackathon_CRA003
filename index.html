@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AEGIS · Sensor consensus safety net</title>
+<style>
+:root{color-scheme:dark;--bg:#050a1e;--card:rgba(18,30,66,.6);--line:rgba(120,170,255,.16);--t:#e8f2ff;--mut:#7f93b8;--c:#22d3ee;--m:#e879f9;--a:#fbbf24;--r:#f43f5e;--g:#34d399;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--t);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:radial-gradient(1200px 700px at 15% -10%,#13246a 0,transparent 60%),radial-gradient(900px 600px at 100% 100%,#3b0f5c 0,transparent 55%),var(--bg);background-attachment:fixed}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.35;mask-image:radial-gradient(circle at 50% 30%,#000,transparent 75%)}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 transparent;transition:box-shadow .3s}
+body.crit::after{animation:edge .8s infinite alternate}
+@keyframes edge{from{box-shadow:inset 0 0 60px 6px rgba(244,63,94,.35)}to{box-shadow:inset 0 0 160px 30px rgba(244,63,94,.85)}}
+header{position:relative;display:flex;align-items:center;gap:14px;padding:14px 20px;flex-wrap:wrap}
+.logo{font-size:30px;font-weight:800;letter-spacing:.18em;color:var(--c);text-shadow:0 0 18px var(--c),0 0 40px rgba(34,211,238,.5)}
+.sub{color:var(--mut);font-size:13px}
+.mode{margin-left:auto;padding:4px 12px;border:1px solid var(--m);color:var(--m);border-radius:99px;font-size:12px;font-weight:700;box-shadow:0 0 12px rgba(232,121,249,.4)}
+.badge{--tc:var(--g);min-width:230px;text-align:center;padding:10px 28px;border-radius:14px;font-size:30px;font-weight:800;letter-spacing:.08em;color:var(--tc);border:2px solid var(--tc);background:rgba(0,0,0,.35);text-shadow:0 0 16px var(--tc);box-shadow:0 0 28px -4px var(--tc);animation:breathe 3s infinite}
+.badge.WARNING{animation:pulse .9s infinite}.badge.CRITICAL{animation:flash .45s infinite alternate;background:rgba(244,63,94,.25)}
+@keyframes breathe{50%{box-shadow:0 0 44px 2px var(--tc)}}@keyframes pulse{50%{box-shadow:0 0 50px 8px var(--tc);transform:scale(1.03)}}@keyframes flash{to{box-shadow:0 0 70px 14px var(--tc);filter:brightness(1.4)}}
+button{font:inherit;cursor:pointer;color:var(--t);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.5);border-radius:10px;padding:8px 12px;transition:.15s}
+button:hover:not(:disabled){background:rgba(34,211,238,.28);box-shadow:0 0 16px rgba(34,211,238,.5)}
+button:disabled{opacity:.4;cursor:not-allowed}button:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+button.big{font-weight:700;padding:12px 16px}
+button.hot{border-color:var(--m);background:rgba(232,121,249,.14)}button.hot:hover:not(:disabled){background:rgba(232,121,249,.32);box-shadow:0 0 16px rgba(232,121,249,.6)}
+button.red{border-color:var(--r);background:rgba(244,63,94,.18)}
+main{position:relative;display:grid;gap:14px;padding:0 20px 24px;grid-template-columns:repeat(3,minmax(0,1fr)) 340px;grid-template-areas:"imu imu imu tl" "gau rad mesh tl" "ben ben ctl tl"}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;backdrop-filter:blur(10px);min-width:0}
+.card h3{margin:0 0 8px;font-size:14px;color:var(--c);font-weight:700}
+canvas{width:100%;display:block}
+#cImu{height:170px}#cG{height:150px}#cR{height:200px}
+.imu{grid-area:imu}.gau{grid-area:gau}.rad{grid-area:rad}.mesh{grid-area:mesh}.tl{grid-area:tl;max-height:760px;display:flex;flex-direction:column}.ben{grid-area:ben}.ctl{grid-area:ctl}
+.node{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.dot{width:14px;height:14px;border-radius:50%;background:var(--g);box-shadow:0 0 12px var(--g)}.dot.p{animation:hb .6s}
+@keyframes hb{0%{transform:scale(2.2)}100%{transform:scale(1)}}
+.node.off{border-color:var(--r);background:rgba(244,63,94,.12)}.node.off .dot{background:var(--r);box-shadow:0 0 12px var(--r)}
+.node b{display:block}.node small{color:var(--mut)}.sig{margin-left:auto;width:56px;height:6px;background:rgba(255,255,255,.12);border-radius:9px;overflow:hidden}.sig i{display:block;height:100%;background:var(--g);transition:width .5s}
+#list{overflow:auto;display:flex;flex-direction:column;gap:8px;flex:1}
+.empty{color:var(--mut);padding:10px;font-size:13px}
+.inc{--tc:var(--c);border:1px solid var(--line);border-left:4px solid var(--tc);border-radius:10px;padding:9px 10px;background:rgba(0,0,0,.25);cursor:pointer}
+.inc:hover{box-shadow:0 0 16px -2px var(--tc)}
+.inc .r1{display:flex;justify-content:space-between;gap:8px;font-weight:600}.inc .r2{color:var(--mut);font-size:12px;margin-top:3px}
+.chip{font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--tc);color:var(--tc)}
+.lab{display:flex;gap:6px;margin-top:6px;align-items:center;font-size:12px;color:var(--mut)}.lab button{padding:2px 9px;font-size:12px}.lab button.on{background:var(--m);color:#12001a;border-color:var(--m)}
+.bars{display:grid;gap:10px;margin:8px 0}.bar{display:grid;grid-template-columns:130px 1fr 52px;gap:10px;align-items:center;font-size:13px}
+.track{height:18px;background:rgba(255,255,255,.08);border-radius:9px;overflow:hidden}.track i{display:block;height:100%;width:0;transition:width 1s cubic-bezier(.2,.8,.2,1);border-radius:9px}
+.stats{display:flex;gap:18px;flex-wrap:wrap;color:var(--mut);font-size:13px}.stats b{color:var(--t);font-size:18px}
+.tog{display:inline-flex;border:1px solid var(--c);border-radius:10px;overflow:hidden}.tog button{border:0;border-radius:0;background:none}.tog button.on{background:var(--c);color:#02121a;font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#prog{height:6px;background:rgba(255,255,255,.1);border-radius:9px;margin-top:10px;overflow:hidden;display:none}#prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--m));transition:width .2s}
+#cap{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:min(760px,92vw);padding:12px 20px;border-radius:14px;background:rgba(5,10,30,.92);border:1px solid var(--m);box-shadow:0 0 30px rgba(232,121,249,.5);font-size:18px;font-weight:600;text-align:center;display:none;z-index:20}
+.modal{position:fixed;inset:0;background:rgba(2,5,16,.8);display:none;align-items:center;justify-content:center;z-index:30;padding:16px}.modal.show{display:flex}
+.box{background:#0b1535;border:1px solid var(--c);border-radius:18px;padding:22px;max-width:680px;width:100%;box-shadow:0 0 50px rgba(34,211,238,.3);max-height:92vh;overflow:auto}
+.box h2{margin:0 0 10px;color:var(--c)}.box ol{padding-left:20px}.box li{margin:8px 0}
+input[type=range]{width:100%;accent-color:var(--m)}
+.why li{color:var(--mut)}.why li.on{color:var(--t)}
+@media(max-width:1000px){main{grid-template-columns:1fr 1fr;grid-template-areas:"imu imu" "gau rad" "mesh mesh" "ctl ctl" "ben ben" "tl tl"}.tl{max-height:420px}.bar{grid-template-columns:100px 1fr 46px}}
+@media(max-width:560px){main{grid-template-columns:1fr;grid-template-areas:"imu" "gau" "rad" "mesh" "ctl" "ben" "tl"}.badge{min-width:0;width:100%}}
+@media(prefers-reduced-motion:reduce){.badge,body.crit::after{animation:none!important}}
+</style></head><body>
+<header>
+ <div class="logo">AEGIS</div><div class="sub">Two sensors must agree before the siren fires</div>
+ <div class="mode">SIM MODE</div>
+ <div id="badge" class="badge SAFE">SAFE</div>
+ <button id="ack" class="red big" disabled>Acknowledge</button>
+ <button id="mute" aria-label="Toggle sound">Sound on</button><button id="help" aria-label="How to use">?</button>
+</header>
+<main>
+ <section class="card imu"><h3>Wearable motion (20 Hz) with fall phases</h3><canvas id="cImu"></canvas></section>
+ <section class="card gau"><h3>Pre-fall risk</h3><canvas id="cG"></canvas></section>
+ <section class="card rad"><h3>Room radar</h3><canvas id="cR"></canvas></section>
+ <section class="card mesh"><h3>Mesh health</h3>
+  <div class="node" id="nw"><div class="dot"></div><div><b>Wearable</b><small id="sw">just now</small></div><div class="sig"><i id="gw" style="width:85%"></i></div></div>
+  <div class="node" id="nr"><div class="dot"></div><div><b>Room node</b><small id="sr">just now</small></div><div class="sig"><i id="gr" style="width:90%"></i></div></div>
+  <small id="mmsg" class="sub">Both nodes sending heartbeats every 2 s.</small></section>
+ <section class="card ben"><h3>Benchmark: does consensus cut false alarms?</h3>
+  <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><span class="sub">Decision mode</span><div class="tog"><button id="mOn" class="on">Consensus ON</button><button id="mOff">Consensus OFF</button></div></div>
+  <div class="bars">
+   <div class="bar"><span>Any single sensor</span><div class="track"><i id="bOff" style="background:var(--r)"></i></div><b id="vOff">0%</b></div>
+   <div class="bar"><span>Consensus (2 agree)</span><div class="track"><i id="bOn" style="background:var(--g)"></i></div><b id="vOn">0%</b></div></div>
+  <div class="stats"><span>False-alarm rate shown above · simulated data</span><span>Latency avg <b id="lA">–</b></span><span>min <b id="lM">–</b></span><span>max <b id="lX">–</b></span><span>Incidents <b id="nI">0</b></span></div>
+  <div id="verdict" class="sub" style="margin-top:8px"></div></section>
+ <section class="card ctl"><h3>Try it</h3>
+  <div class="grid2">
+   <button data-s="fake">Drop the wearable</button><button data-s="real">Real fall</button>
+   <button data-s="cleared">Fall, then "I'm OK"</button><button data-s="sos">SOS button</button>
+   <button data-s="stumble">Stumble</button><button data-s="offline">Node goes offline</button>
+   <button id="demo" class="hot big">Run 90 s demo</button><button id="exp" class="hot big">Run 20-event test</button></div>
+  <div id="prog"><i></i></div></section>
+ <aside class="card tl"><h3>Incidents · click one to replay</h3><div id="list"></div></aside>
+</main>
+<div id="cap"></div>
+<div class="modal" id="how"><div class="box"><h2>How AEGIS works</h2>
+ <ol><li><b>Press a button under "Try it".</b> Start with "Drop the wearable", then "Real fall".</li>
+ <li><b>Watch the status badge.</b> One sensor alone gives a soft WARNING. Two sensors agreeing within 2 s give CRITICAL.</li>
+ <li><b>Prove it.</b> Press "Run 20-event test" and read the false-alarm bars. Click any incident to replay why it fired.</li></ol>
+ <button class="big hot" id="gotit">Got it, start</button></div></div>
+<div class="modal" id="rep"><div class="box"><h2 id="rtitle">Replay</h2>
+ <canvas id="cRep" style="height:150px"></canvas><input type="range" id="rs" min="0" max="100" value="0" aria-label="Replay position">
+ <div class="sub" id="rt"></div><h3 style="color:var(--m);margin:12px 0 4px">Why did this fire?</h3><ol class="why" id="why"></ol>
+ <div id="rfin" style="margin:8px 0;font-weight:700"></div><button id="rclose">Close</button></div></div>
+<script>
+const $=s=>document.querySelector(s),COL={SAFE:'#34d399',INFO:'#22d3ee',WARNING:'#fbbf24',CRITICAL:'#f43f5e',CLEARED:'#34d399'},RANK=['SAFE','INFO','WARNING','CRITICAL'],rk=t=>Math.max(0,RANK.indexOf(t));
+const S={tier:'SAFE',risk:12,riskT:12,hold:false,cons:true,busy:false,K:1,quiet:false,mute:false,ph:'idle',imu:[],inc:[],cur:null,w:{seen:Date.now(),on:true},r:{seen:Date.now(),on:true},rad:{dist:150,nomove:false,rip:[]}};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms*S.K)),rnd=(a,b)=>a+Math.random()*(b-a),now=()=>performance.now();
+let AC,alarm,flip=0;
+function beep(f,d){if(S.mute||S.quiet)return;try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type='square';o.frequency.value=f;g.gain.value=.04;o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+function setTier(t){S.tier=t;const b=$('#badge');b.textContent=t==='CRITICAL'?'CRITICAL':t;b.className='badge '+(t==='CLEARED'?'SAFE':t);b.style.setProperty('--tc',COL[t]);document.body.classList.toggle('crit',t==='CRITICAL');$('#ack').disabled=t!=='CRITICAL';
+ clearInterval(alarm);alarm=null;if(t==='CRITICAL')alarm=setInterval(()=>beep((flip^=1)?880:660,.2),400);else if(t==='WARNING')beep(520,.15)}
+function cap(t){const c=$('#cap');c.textContent=t;c.style.display=t?'block':'none'}
+function ev(src,type,tier,msg){const c=S.cur;if(c)c.ev.push({t:now(),src,type,tier,msg})}
+function begin(title,label){S.cur={id:S.inc.length+1,title,label,t0:now(),ev:[],imu:[],on:'SAFE',off:'SAFE',lat:null,done:false,wall:new Date()};S.inc.unshift(S.cur);render()}
+function end(){if(S.cur){S.cur.done=true;S.cur.t1=now()}S.ph='idle'}
+function resolve(on,off){const c=S.cur;if(rk(on)>rk(c.on))c.on=on;if(rk(off)>rk(c.off))c.off=off;const t=S.cons?on:off;setTier(t);if(t==='CRITICAL'&&!c.lat)c.lat=Math.round(rnd(150,300));render()}
+function ack(){if(S.tier==='CRITICAL'){setTier('SAFE');S.rad.nomove=false;S.riskT=12;S.hold=false}}
+async function fall(){S.hold=true;S.riskT=70;S.ph='freefall';await sleep(350);S.ph='impact';await sleep(200);S.ph='still';ev('wearable','fall','WARNING','Wearable: free-fall, impact, then stillness')}
+async function fake(){begin('Wearable dropped on table','fake');S.ph='spike';S.riskT=40;ev('wearable','spike','INFO','Wearable: sharp IMU spike (4.1 g)');await sleep(500);ev('wearable','fall','WARNING','Wearable: fall-like impact reported');ev('room','motion','INFO','Room: normal movement still seen, so no one is down');S.rad.rip.push(0);resolve('WARNING','CRITICAL');await sleep(2500);S.riskT=12;if(S.tier==='WARNING')setTier('SAFE');end()}
+async function real(){begin('Real fall','real');await fall();resolve('WARNING','CRITICAL');await sleep(1500);S.rad.nomove=true;S.rad.dist=60;ev('room','presence','WARNING','Room: person on floor, no movement for 3 s');ev('system','critical','CRITICAL','Two independent sources agree within 2 s');resolve('CRITICAL','CRITICAL');end()}
+async function cleared(){begin('Fall, wearer pressed I\'m OK','fake');await fall();resolve('WARNING','CRITICAL');await sleep(1800);ev('wearable','cleared','CLEARED','Wearer pressed I\'m OK during the countdown');setTier('CLEARED');S.riskT=12;await sleep(1200);setTier('SAFE');end()}
+async function sos(){begin('SOS long-press','real');S.riskT=55;ev('wearable','sos','CRITICAL','Wearable: SOS held for 2 s');ev('system','critical','CRITICAL','SOS skips consensus, so siren fires');resolve('CRITICAL','CRITICAL');end()}
+async function stumble(){begin('Stumble warning','info');S.hold=true;S.riskT=78;ev('wearable','stumble','INFO','Risk score above 60, double beep on wearable');setTier('INFO');beep(700,.1);await sleep(2800);S.riskT=12;S.hold=false;setTier('SAFE');end()}
+async function offline(){begin('Wearable offline','info');S.w.on=false;ev('system','offline','WARNING','Wearable missed 3 heartbeats');resolve('WARNING','WARNING');await sleep(4000);S.w.on=true;S.w.seen=Date.now();ev('system','recovered','INFO','Wearable back, recovered in 4.0 s');S.cur.rec=1;setTier('SAFE');end()}
+const SC={fake,real,cleared,sos,stumble,offline};
+async function run(fn){if(S.busy)return;S.busy=true;lock();try{await fn()}finally{S.busy=false;lock()}}
+function lock(){document.querySelectorAll('[data-s],#demo,#exp').forEach(b=>b.disabled=S.busy)}
+async function demo(){S.K=.7;cap('1. Someone drops the wearable on the table');await fake();cap('IMU spiked, the room disagrees: soft warning only. False alarm avoided.');await sleep(2600);
+ cap('2. Now a real fall');await real();cap('Wearable and room agree within 2 s: CRITICAL, siren and relay on');await sleep(3800);ack();
+ cap('3. Fall, but the wearer presses I\'m OK');await cleared();await sleep(1500);cap('4. The wearable dies mid-shift');await offline();cap('Dead node flagged, then recovered');await sleep(2200);cap('Now press "Run 20-event test" for the numbers');await sleep(2500);cap('');S.K=1}
+async function exp(){S.K=.1;S.quiet=true;S.inc=[];render();const q=[];for(let i=0;i<5;i++)q.push(fake,cleared,real,sos);q.sort(()=>Math.random()-.5);const p=$('#prog');p.style.display='block';
+ for(let i=0;i<q.length;i++){p.firstChild.style.width=((i+1)/q.length*100)+'%';cap('Staged event '+(i+1)+' of 20');await q[i]();ack();await sleep(300)}
+ S.K=1;S.quiet=false;S.hold=false;p.style.display='none';const s=stats(),cut=s.off?Math.round((s.off-s.on)/s.off*100):0;cap('Consensus cut false alarms by '+cut+'%');setTimeout(()=>cap(''),5000)}
+function stats(){const f=S.inc.filter(i=>i.label==='fake'),n=f.length||1;return{n:f.length,off:f.filter(i=>i.off==='CRITICAL').length/n,on:f.filter(i=>i.on==='CRITICAL').length/n,lat:S.inc.filter(i=>i.lat).map(i=>i.lat)}}
+function render(){const L=$('#list');L.innerHTML='';if(!S.inc.length)L.innerHTML='<div class="empty">No incidents yet. Press "Drop the wearable" under Try it.</div>';
+ S.inc.forEach(i=>{const t=S.cons?i.on:i.off,d=document.createElement('div');d.className='inc';d.style.setProperty('--tc',COL[t]);
+  d.innerHTML=`<div class="r1"><span>${i.title}</span><span class="chip">${t==='SAFE'?'no alarm':t}</span></div><div class="r2">${i.wall.toLocaleTimeString()}${i.lat?' · '+i.lat+' ms sensor to siren':''}</div>`;
+  if(i.label!=='info'){const l=document.createElement('div');l.className='lab';l.innerHTML='<span>Label:</span>';['fake','real'].forEach(k=>{const b=document.createElement('button');b.textContent=k==='fake'?'False alarm':'Real emergency';b.className=i.label===k?'on':'';b.onclick=e=>{e.stopPropagation();i.label=k;render()};l.appendChild(b)});d.appendChild(l)}
+  d.onclick=()=>replay(i);L.appendChild(d)});
+ const s=stats();$('#bOff').style.width=s.off*100+'%';$('#bOn').style.width=s.on*100+'%';$('#vOff').textContent=Math.round(s.off*100)+'%';$('#vOn').textContent=Math.round(s.on*100)+'%';$('#nI').textContent=S.inc.length;
+ const a=s.lat;$('#lA').textContent=a.length?Math.round(a.reduce((x,y)=>x+y)/a.length)+' ms':'–';$('#lM').textContent=a.length?Math.min(...a)+' ms':'–';$('#lX').textContent=a.length?Math.max(...a)+' ms':'–';
+ $('#verdict').textContent=s.n&&s.off>0?'Consensus cut false alarms by '+Math.round((s.off-s.on)/s.off*100)+'% across '+s.n+' staged false events.':'Run the 20-event test to fill this in.'}
+function fit(c){const r=devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;if(c.width!==w*r||c.height!==h*r){c.width=w*r;c.height=h*r}const x=c.getContext('2d');x.setTransform(r,0,0,r,0,0);return[x,w,h]}
+const PC={freefall:'rgba(34,211,238,.22)',impact:'rgba(232,121,249,.3)',still:'rgba(251,191,36,.2)'};
+function plot(c,smp,mark){const[x,w,h]=fit(c);x.clearRect(0,0,w,h);const n=smp.length;if(n<2)return;const dx=w/Math.max(n-1,199),sx=i=>i*dx+(n<200?0:0);
+ smp.forEach((s,i)=>{if(PC[s.ph]){x.fillStyle=PC[s.ph];x.fillRect(sx(i),0,dx+1,h)}});
+ x.strokeStyle='rgba(120,170,255,.2)';x.beginPath();x.moveTo(0,h/2);x.lineTo(w,h/2);x.stroke();
+ [['ax','#22d3ee'],['ay','#e879f9'],['az','#fbbf24']].forEach(([k,col])=>{x.strokeStyle=col;x.lineWidth=1.6;x.shadowColor=col;x.shadowBlur=6;x.beginPath();smp.forEach((s,i)=>{const y=h/2-(s[k]/6)*(h/2-6);i?x.lineTo(sx(i),y):x.moveTo(sx(i),y)});x.stroke()});x.shadowBlur=0;
+ if(mark!=null){x.strokeStyle='#fff';x.beginPath();x.moveTo(mark*w,0);x.lineTo(mark*w,h);x.stroke()}}
+function sample(){const p=S.ph,n=()=>rnd(-1,1);let a;
+ if(p==='idle')a={ax:n()*.08,ay:n()*.08,az:1+n()*.06};else if(p==='spike')a={ax:n()*3,ay:n()*3,az:n()*4};else if(p==='freefall')a={ax:n()*.1,ay:n()*.1,az:.1+n()*.1};else if(p==='impact')a={ax:n()*5,ay:n()*5,az:rnd(3,6)};else a={ax:.02*n(),ay:.02*n(),az:1+.01*n()};
+ a.ph=p;a.t=now();S.imu.push(a);if(S.imu.length>200)S.imu.shift();if(S.cur&&!S.cur.done&&S.cur.imu.length<500)S.cur.imu.push(a)}
+setInterval(sample,50);
+setInterval(()=>{if(!S.hold&&!S.busy)S.riskT=rnd(6,24)},1500);
+function gauge(){const c=$('#cG'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);S.risk+=(S.riskT-S.risk)*.08;const cx=w/2,cy=h-14,R=Math.min(w/2-16,h-26);x.lineWidth=16;x.lineCap='round';
+ const A=v=>Math.PI+v/100*Math.PI;[[0,50,'#34d399'],[50,70,'#fbbf24'],[70,100,'#f43f5e']].forEach(([a,b,col])=>{x.strokeStyle=col;x.globalAlpha=.3;x.beginPath();x.arc(cx,cy,R,A(a),A(b));x.stroke()});x.globalAlpha=1;
+ const col=S.risk<50?'#34d399':S.risk<60?'#fbbf24':'#f43f5e';x.strokeStyle=col;x.shadowColor=col;x.shadowBlur=18;x.beginPath();x.arc(cx,cy,R,Math.PI,A(S.risk));x.stroke();x.shadowBlur=0;
+ const a=A(S.risk);x.strokeStyle='#fff';x.lineWidth=3;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+Math.cos(a)*(R-22),cy+Math.sin(a)*(R-22));x.stroke();
+ x.fillStyle=col;x.font='800 34px system-ui';x.textAlign='center';x.fillText(Math.round(S.risk),cx,cy-R*.35);x.fillStyle='#7f93b8';x.font='12px system-ui';x.fillText('stumble alert above 60',cx,cy+10)}
+let sw=0;
+function radar(){const c=$('#cR'),[x,w,h]=fit(c);x.clearRect(0,0,w,h);const cx=w/2,cy=h/2,R=Math.min(cx,cy)-6;x.strokeStyle='rgba(34,211,238,.3)';x.lineWidth=1;for(let i=1;i<=3;i++){x.beginPath();x.arc(cx,cy,R*i/3,0,7);x.stroke()}x.beginPath();x.moveTo(cx-R,cy);x.lineTo(cx+R,cy);x.moveTo(cx,cy-R);x.lineTo(cx,cy+R);x.stroke();
+ sw+=.04;for(let i=0;i<24;i++){x.strokeStyle=`rgba(34,211,238,${.5-i*.02})`;x.lineWidth=2;x.beginPath();x.moveTo(cx,cy);x.lineTo(cx+Math.cos(sw-i*.03)*R,cy+Math.sin(sw-i*.03)*R);x.stroke()}
+ const nm=S.rad.nomove,col=nm?'#f43f5e':'#34d399';if(!nm)S.rad.dist+=rnd(-2,2),S.rad.dist=Math.max(90,Math.min(200,S.rad.dist));const r=S.rad.dist/220*R,bx=cx+Math.cos(.9)*r,by=cy+Math.sin(.9)*r;
+ x.fillStyle=col;x.shadowColor=col;x.shadowBlur=16;x.beginPath();x.arc(bx,by,6+Math.sin(now()/200)*(nm?0:2),0,7);x.fill();x.shadowBlur=0;
+ if(!nm&&Math.random()<.01)S.rad.rip.push(0);S.rad.rip=S.rad.rip.map(v=>v+2).filter(v=>v<50);S.rad.rip.forEach(v=>{x.strokeStyle=`rgba(52,211,153,${1-v/50})`;x.beginPath();x.arc(bx,by,v,0,7);x.stroke()});
+ if(nm){x.fillStyle='#f43f5e';x.font='800 15px system-ui';x.textAlign='center';x.fillText('NO MOVEMENT',cx,cy-R*.55)}}
+function mesh(){[['w','nw','sw','gw'],['r','nr','sr','gr']].forEach(([k,n,s,g])=>{const o=S[k];$('#'+n).classList.toggle('off',!o.on);$('#'+s).textContent=o.on?((Date.now()-o.seen)/1000).toFixed(1)+' s ago':'OFFLINE, missed 3 heartbeats';$('#'+g).style.width=o.on?'88%':'0%'});$('#mmsg').textContent=S.w.on?'Both nodes sending heartbeats every 2 s.':'Wearable lost. Room node keeps watching alone.'}
+setInterval(mesh,250);
+setInterval(()=>{[['w','nw'],['r','nr']].forEach(([k,n])=>{if(S[k].on){S[k].seen=Date.now();const d=$('#'+n+' .dot');d.classList.remove('p');void d.offsetWidth;d.classList.add('p')}})},2000);
+function frame(){plot($('#cImu'),S.imu);gauge();radar();requestAnimationFrame(frame)}frame();
+function replay(i){const m=$('#rep'),dur=(i.t1||now())-i.t0,rs=$('#rs');$('#rtitle').textContent='Replay: '+i.title;m.classList.add('show');
+ const draw=()=>{const v=rs.value/100,t=v*dur;plot($('#cRep'),i.imu.slice(0,Math.max(2,Math.round(v*i.imu.length))),null);$('#rt').textContent='t = '+(t/1000).toFixed(1)+' s of '+(dur/1000).toFixed(1)+' s';
+  const w=$('#why');w.innerHTML='';i.ev.forEach((e,k)=>{const li=document.createElement('li');li.className=(e.t-i.t0)<=t?'on':'';li.textContent=(k+1)+'. ['+((e.t-i.t0)/1000).toFixed(1)+' s] '+e.msg;w.appendChild(li)});
+  $('#rfin').textContent=v>.98?'Consensus ON: '+(i.on==='SAFE'?'no alarm':i.on)+'   |   Consensus OFF: '+(i.off==='SAFE'?'no alarm':i.off):''};
+ rs.oninput=draw;rs.value=100;draw()}
+$('#rclose').onclick=()=>$('#rep').classList.remove('show');
+document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>run(SC[b.dataset.s]));
+$('#demo').onclick=()=>run(demo);$('#exp').onclick=()=>run(exp);$('#ack').onclick=ack;
+$('#mOn').onclick=()=>{S.cons=true;$('#mOn').className='on';$('#mOff').className='';render()};$('#mOff').onclick=()=>{S.cons=false;$('#mOff').className='on';$('#mOn').className='';render()};
+$('#mute').onclick=()=>{S.mute=!S.mute;$('#mute').textContent=S.mute?'Sound off':'Sound on'};
+$('#help').onclick=()=>$('#how').classList.add('show');$('#gotit').onclick=()=>$('#how').classList.remove('show');
+$('#how').classList.add('show');render();
+</script></body></html>
